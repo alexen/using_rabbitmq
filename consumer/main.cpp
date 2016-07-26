@@ -67,12 +67,12 @@ int main()
      {
           const auto hostname = "10.0.10.229";
           const auto port = 5672;
-          const auto virtualHost = "b2b";
+          const auto virtualHost = "vhost.test";
           const auto username = "guest";
           const auto password = "guest";
-          const auto exchange = "amq.direct";
-          const auto routingKey = "billing";
-          const auto queueName = "billing";
+          const auto exchange = "exchange.test.fanout";
+          const auto routingKey = "";
+          const auto queueName = "";
           const boost::chrono::milliseconds procDelay( 0 );
 
           boost::thread_group tg;

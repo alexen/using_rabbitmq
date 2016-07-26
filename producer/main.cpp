@@ -22,7 +22,7 @@ int main()
           const auto virtualHost = "vhost.test";
           const auto exchange = "exchange.test.fanout";
           const auto routingKey = "";
-          const auto queueName = "";
+          const auto queueName = "queue.test.001";
           const auto message =
                "My Bonny is over the ocean,\n"
                "My Bonny is over the sea,\n"
@@ -32,13 +32,8 @@ int main()
           const Connection::Parameters params( hostname, port, username, password, virtualHost );
           Connection connection( params );
 
-          std::cout << "Press any key to continue...\n";
-          std::cin.get();
-
-          SimpleClient::publishMessage( connection, exchange, routingKey, message );
-
-          std::cout << "Press any key to continue...\n";
-          std::cin.get();
+          /// Публикуем сообщение только в exchange (как и полагается)
+          SimpleClient::publishMessage( connection, "", queueName, message );
 
           std::cout << "Done.\n";
      }

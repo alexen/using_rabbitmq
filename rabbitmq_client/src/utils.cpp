@@ -10,9 +10,15 @@ namespace ts {
 namespace rabbitmq_client {
 
 
-std::string makeString( const amqp_bytes_t& bytes )
+std::string toString( const amqp_bytes_t& bytes )
 {
      return std::string( static_cast< const char* >( bytes.bytes ), bytes.len );
+}
+
+
+amqp_bytes_t fromString( const std::string& str )
+{
+     return str.empty() ? amqp_empty_bytes : amqp_cstring_bytes( str.c_str() );
 }
 
 

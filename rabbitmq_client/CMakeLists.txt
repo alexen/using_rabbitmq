@@ -9,4 +9,5 @@ add_library(${NAME}
 target_link_libraries(${NAME}
     ${RABBITMQ_LIBRARIES}
     ${Boost_THREAD_LIBRARY}
+    ${Boost_SYSTEM_LIBRARY}
 )

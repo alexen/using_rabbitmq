@@ -190,6 +190,24 @@ void SimpleClient::publishMessage( const Connection& connection, const SimpleCli
 }
 
 
+void SimpleClient::publishMessage( const Connection& connection, const std::string& exchange, const std::string& routingKey, const std::string& message )
+{
+     ensureNoErrors(
+          amqp_basic_publish(
+               connection.impl_->connection, /* amqp_connection_state_t                 state       */
+               1,                            /* amqp_channel_t                          channel     */
+               fromString( exchange ),       /* amqp_bytes_t                            exchange    */
+               fromString( routingKey ),     /* amqp_bytes_t                            routing_key */
+               0,                            /* amqp_boolean_t                          mandatory   */
+               0,                            /* amqp_boolean_t                          immediate   */
+               nullptr,                      /* struct amqp_basic_properties_t_ const * properties  */
+               fromString( message )         /* amqp_bytes_t                            body        */
+          ),
+          "basic publish"
+     );
+}
+
+
 void SimpleClient::bind( const Connection& connection, const SimpleClient::QueueParameters& params )
 {
      amqp_queue_bind(
@@ -266,7 +284,7 @@ boost::optional< SimpleClient::Envelope > SimpleClient::consumeMessage(
 
      std::unique_ptr< amqp_envelope_t, void(*)( amqp_envelope_t* ) > autocleaner( &envelope, amqp_destroy_envelope );
 
-     return SimpleClient::Envelope( makeString( envelope.message.body ), envelope.delivery_tag );
+     return SimpleClient::Envelope( toString( envelope.message.body ), envelope.delivery_tag );
 }
 
 

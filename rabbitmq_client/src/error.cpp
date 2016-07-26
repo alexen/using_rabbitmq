@@ -58,7 +58,7 @@ void ensureNoErrors( const amqp_method_number_t methodId, const void* decoded )
                if( const auto details = static_cast< const amqp_connection_close_t* >( decoded ) )
                {
                     ostr << ": " << details->reply_code
-                         << ", message: " << makeString( details->reply_text );
+                         << ", message: " << toString( details->reply_text );
                }
                throw_exception::connectionError( ostr.str() );
                break;
@@ -69,7 +69,7 @@ void ensureNoErrors( const amqp_method_number_t methodId, const void* decoded )
                if( const auto details = static_cast< const amqp_channel_close_t * >( decoded ) )
                {
                     ostr << ": " << details->reply_code
-                         << ", message: " << makeString( details->reply_text );
+                         << ", message: " << toString( details->reply_text );
                }
                throw_exception::connectionError( ostr.str() );
                break;

@@ -4,8 +4,9 @@
 
 #pragma once
 
-#include <rabbitmq_client/fwd.h>
+#include <stdexcept>
 #include <string>
+#include <amqp.h>
 
 
 namespace edi {

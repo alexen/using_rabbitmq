@@ -146,7 +146,6 @@ int main()
                     reconnectionRequired = true;
                }
           }
-
           std::cout << "Success!\n";
      }
      catch( const std::exception& e )

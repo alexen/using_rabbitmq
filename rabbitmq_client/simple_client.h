@@ -26,21 +26,21 @@ public:
           Parameters(
                std::string&& host,
                int port_,
-               std::string&& vhost,
                std::string&& user,
-               std::string&& pwd
+               std::string&& pwd,
+               std::string&& vhost
           )
                : hostname( std::move( host ) )
                , port( port_ )
-               , virtualHost( std::move( vhost ) )
                , username( std::move( user ) )
                , password( std::move( pwd ) )
+               , virtualHost( std::move( vhost ) )
           {}
           std::string hostname;    ///< имя или IP адрес узла, на котором развернут сервер с очередью сообщений
           int port = 0;            ///< порт подключения к очереди
-          std::string virtualHost; ///< имя виртуального хоста очереди
           std::string username;    ///< имя пользователя
           std::string password;    ///< пароль пользователя
+          std::string virtualHost; ///< имя виртуального хоста очереди
      };
 
      /// Конструктор. Автоматически вызывает метод connect()
@@ -139,6 +139,7 @@ public:
 
      static void publishMessage( const Connection&, const QueueParameters&, const std::string& message );
 
+     static void publishMessage( const Connection&, const std::string& exchange, const std::string& routingKey, const std::string& message );
 private:
 
      static void bind( const Connection&, const QueueParameters& );

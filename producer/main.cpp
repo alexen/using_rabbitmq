@@ -10,23 +10,35 @@
 
 int main()
 {
+     using edi::ts::rabbitmq_client::Connection;
      using edi::ts::rabbitmq_client::SimpleClient;
 
      try
      {
           const auto hostname = "localhost";
           const auto port = 5672;
-          const auto virtualHost = "b2b";
           const auto username = "guest";
           const auto password = "guest";
-          const auto exchange = "amq.direct";
-          const auto routingKey = "billing";
-          const auto queueName = "billing";
+          const auto virtualHost = "vhost.test";
+          const auto exchange = "exchange.test.fanout";
+          const auto routingKey = "";
+          const auto queueName = "";
           const auto message =
                "My Bonny is over the ocean,\n"
                "My Bonny is over the sea,\n"
                "My Bonny is over the ocean\n"
                "So bring back my Bonny to me..";
+
+          const Connection::Parameters params( hostname, port, username, password, virtualHost );
+          Connection connection( params );
+
+          std::cout << "Press any key to continue...\n";
+          std::cin.get();
+
+          SimpleClient::publishMessage( connection, exchange, routingKey, message );
+
+          std::cout << "Press any key to continue...\n";
+          std::cin.get();
 
           std::cout << "Done.\n";
      }

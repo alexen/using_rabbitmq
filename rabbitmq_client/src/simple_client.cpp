@@ -208,6 +208,72 @@ void SimpleClient::publishMessage( const Connection& connection, const std::stri
 }
 
 
+boost::optional< SimpleClient::Envelope > SimpleClient::consumeMessage(
+     const Connection& connection,
+     const std::string& queueName,
+     const boost::optional< boost::posix_time::time_duration >& timeout
+)
+{
+     static auto makeTimeval =
+          []( const boost::optional< boost::posix_time::time_duration >& duration ) -> std::unique_ptr< timeval >
+          {
+               if( duration )
+               {
+                    std::unique_ptr< timeval > tv( new timeval );
+                    tv->tv_sec = duration->total_seconds();
+                    tv->tv_usec = duration->fractional_seconds();
+                    return tv;
+               }
+
+               return nullptr;
+          };
+
+     amqp_basic_consume(
+          connection.impl_->connection, /* amqp_connection_state_t state        */
+          1,                            /* amqp_channel_t          channel      */
+          fromString( queueName ),      /* amqp_bytes_t            queue        */
+          amqp_empty_bytes,             /* amqp_bytes_t            consumer_tag */
+          0,                            /* amqp_boolean_t          no_local     */
+          0,                            /* amqp_boolean_t          no_ack       */
+          0,                            /* amqp_boolean_t          exclusive    */
+          amqp_empty_table              /* amqp_table_t            arguments    */
+     );
+     ensureNoErrors( amqp_get_rpc_reply( connection.impl_->connection ), "basic consume" );
+
+     amqp_maybe_release_buffers( connection.impl_->connection );
+
+     amqp_envelope_t envelope = { 0 };
+
+     const auto timer = makeTimeval( timeout );
+
+     const auto reply =
+          amqp_consume_message(
+               connection.impl_->connection,
+               &envelope,
+               timer ? boost::addressof( *timer ) : nullptr,
+               0
+          );
+
+     if( isTimedOutError( reply ) )
+     {
+          return boost::none;
+     }
+     else if( isUnexpectedFrameStateError( reply ) )
+     {
+          handleUnexpectedFrameStateError( connection );
+          return boost::none;
+     }
+     else
+     {
+          ensureNoErrors( reply, "consume message" );
+     }
+
+     std::unique_ptr< amqp_envelope_t, void(*)( amqp_envelope_t* ) > autocleaner( &envelope, amqp_destroy_envelope );
+
+     return SimpleClient::Envelope( toString( envelope.message.body ), envelope.delivery_tag );
+}
+
+
 void SimpleClient::bind( const Connection& connection, const SimpleClient::QueueParameters& params )
 {
      amqp_queue_bind(
@@ -219,18 +285,6 @@ void SimpleClient::bind( const Connection& connection, const SimpleClient::Queue
           amqp_empty_table                                  /* amqp_table_t            argument    */
      );
      ensureNoErrors( amqp_get_rpc_reply( connection.impl_->connection ), "bind queue" );
-
-     amqp_basic_consume(
-          connection.impl_->connection,                     /* amqp_connection_state_t state        */
-          1,                                                /* amqp_channel_t          channel      */
-          amqp_cstring_bytes( params.queueName.c_str() ),   /* amqp_bytes_t            queue        */
-          amqp_empty_bytes,                                 /* amqp_bytes_t            consumer_tag */
-          0,                                                /* amqp_boolean_t          no_local     */
-          0,                                                /* amqp_boolean_t          no_ack       */
-          0,                                                /* amqp_boolean_t          exclusive    */
-          amqp_empty_table                                  /* amqp_table_t            arguments    */
-     );
-     ensureNoErrors( amqp_get_rpc_reply( connection.impl_->connection ), "basic consume" );
 }
 
 

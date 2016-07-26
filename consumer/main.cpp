@@ -51,13 +51,36 @@ void waitTermination( boost::thread_group& threads, std::initializer_list< int >
 
 void worker(
      const std::string& hostname, const int port,
-     const std::string& virtualHost,
      const std::string& username, const std::string& password,
+     const std::string& virtualHost,
      const std::string& exchange,
      const std::string& routingKey,
      const std::string& queueName,
+     const boost::optional< boost::posix_time::time_duration >& timeout = boost::none,
      const boost::optional< boost::chrono::milliseconds >& processingDelay = boost::none )
 {
+     using edi::ts::rabbitmq_client::Connection;
+     using edi::ts::rabbitmq_client::SimpleClient;
+
+     const Connection::Parameters params(
+          hostname,
+          port,
+          username,
+          password,
+          virtualHost
+     );
+
+     Connection connection( params );
+     const auto& env = SimpleClient::consumeMessage( connection, queueName, timeout );
+     if( env )
+     {
+          std::cout << "Got message:\n" << env->message << "\n";
+          SimpleClient::ackMessage( connection, env->deliveryTag );
+     }
+     else
+     {
+          std::cout << "No message consumed.\n";
+     }
 }
 
 
@@ -65,14 +88,15 @@ int main()
 {
      try
      {
-          const auto hostname = "10.0.10.229";
+          const auto hostname = "localhost";
           const auto port = 5672;
           const auto virtualHost = "vhost.test";
           const auto username = "guest";
           const auto password = "guest";
           const auto exchange = "exchange.test.fanout";
           const auto routingKey = "";
-          const auto queueName = "";
+          const auto queueName = "queue.test.001";
+          const boost::posix_time::seconds timeout( 15 );
           const boost::chrono::milliseconds procDelay( 0 );
 
           boost::thread_group tg;
@@ -82,7 +106,7 @@ int main()
                tg.create_thread(
                     [ & ]()
                     {
-                         worker( hostname, port, virtualHost, username, password, exchange, routingKey, queueName, procDelay );
+                         worker( hostname, port, username, password, virtualHost, exchange, routingKey, queueName, timeout, procDelay );
                     }
                );
           }

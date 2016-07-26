@@ -24,17 +24,17 @@ public:
      struct Parameters
      {
           Parameters(
-               std::string&& host,
+               const std::string& host,
                int port_,
-               std::string&& user,
-               std::string&& pwd,
-               std::string&& vhost
+               const std::string& user,
+               const std::string& pwd,
+               const std::string& vhost
           )
-               : hostname( std::move( host ) )
+               : hostname( host )
                , port( port_ )
-               , username( std::move( user ) )
-               , password( std::move( pwd ) )
-               , virtualHost( std::move( vhost ) )
+               , username( user )
+               , password( pwd )
+               , virtualHost( vhost )
           {}
           std::string hostname;    ///< имя или IP адрес узла, на котором развернут сервер с очередью сообщений
           int port = 0;            ///< порт подключения к очереди
@@ -112,6 +112,38 @@ public:
      /// Конструктор. Создает внутри себя подключение к очереди посредством вызова конструктора Connection()
      explicit SimpleClient( const Connection::Parameters& );
 
+     static void publishMessage( const Connection&, const std::string& exchange, const std::string& routingKey, const std::string& message );
+
+     static boost::optional< Envelope > consumeMessage(
+          const Connection&,
+          const std::string& queueName,
+          const boost::optional< boost::posix_time::time_duration >& timeout = boost::none
+     );
+
+     static void ackMessage( const Connection&, std::uint64_t deliveryTag );
+
+private:
+     static void publishMessage( const Connection&, const QueueParameters&, const std::string& message );
+
+     static void bind( const Connection&, const QueueParameters& );
+
+     static boost::optional< Envelope > consumeMessage(
+          const Connection&,
+          const QueueParameters&,
+          const boost::optional< boost::posix_time::time_duration >& timeout = boost::none
+     );
+
+     /// Возвращает true, если ожидание сообщений прерывается по таймауту
+     static bool isTimedOutError( const amqp_rpc_reply_t& );
+
+     /// Возвращает true, если приходит сообщение с неверным состоянием фрейма
+     /// @note в этом случае необходимо произвести ряд действий по корректной обработке данного состояния
+     static bool isUnexpectedFrameStateError( const amqp_rpc_reply_t& );
+
+     /// Осуществляет обработку ситуации, когда ожидание сообщения прерывается из-за неверного состояния фрейма
+     /// @note код взят из примера example/amqp_consumer.c библиотеки rabbitmq-c
+     static void handleUnexpectedFrameStateError( const Connection& );
+
      /// @brief Публикует сообщение @a message в очередь, которая описывается параметрами @a param
      /// @note Осуществляет попытки повторного соединения при перехвате исключения ConnectionError
      /// @throw ConnectionError в случае если все попытки подключения закончились неудачей
@@ -136,32 +168,6 @@ public:
      void ackMessage( std::uint64_t deliveryTag );
 
      void reconnect();
-
-     static void publishMessage( const Connection&, const QueueParameters&, const std::string& message );
-
-     static void publishMessage( const Connection&, const std::string& exchange, const std::string& routingKey, const std::string& message );
-private:
-
-     static void bind( const Connection&, const QueueParameters& );
-
-     static boost::optional< Envelope > consumeMessage(
-          const Connection&,
-          const QueueParameters&,
-          const boost::optional< boost::posix_time::time_duration >& timeout = boost::none
-     );
-
-     static void ackMessage( const Connection&, std::uint64_t deliveryTag );
-
-     /// Возвращает true, если ожидание сообщений прерывается по таймауту
-     static bool isTimedOutError( const amqp_rpc_reply_t& );
-
-     /// Возвращает true, если приходит сообщение с неверным состоянием фрейма
-     /// @note в этом случае необходимо произвести ряд действий по корректной обработке данного состояния
-     static bool isUnexpectedFrameStateError( const amqp_rpc_reply_t& );
-
-     /// Осуществляет обработку ситуации, когда ожидание сообщения прерывается из-за неверного состояния фрейма
-     /// @note код взят из примера example/amqp_consumer.c библиотеки rabbitmq-c
-     static void handleUnexpectedFrameStateError( const Connection& );
 
      Connection connection_;
 };

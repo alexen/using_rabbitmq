@@ -35,7 +35,7 @@ int main()
           /// Публикуем N сообщений только в exchange (как и полагается)
           for( int i = 0; i < 5; ++i )
           {
-               SimpleClient::publishMessage( connection, "", queueName, message );
+               SimpleClient::publishMessage( connection, exchange, "", message );
           }
 
           std::cout << "Done.\n";

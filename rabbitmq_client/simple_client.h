@@ -114,6 +114,8 @@ public:
 
      static void publishMessage( const Connection&, const std::string& exchange, const std::string& routingKey, const std::string& message );
 
+     static void bind( const Connection&, const std::string& exchange, const std::string& queueName, const std::string& routingKey = "" );
+
      static boost::optional< Envelope > consumeMessage(
           const Connection&,
           const std::string& queueName,

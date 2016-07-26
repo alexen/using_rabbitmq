@@ -71,6 +71,7 @@ void worker(
      );
 
      Connection connection( params );
+     SimpleClient::bind( connection, exchange, queueName );
      const auto& env = SimpleClient::consumeMessage( connection, queueName, timeout );
      if( env )
      {

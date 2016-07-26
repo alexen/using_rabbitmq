@@ -208,6 +208,20 @@ void SimpleClient::publishMessage( const Connection& connection, const std::stri
 }
 
 
+void SimpleClient::bind( const Connection& connection, const std::string& exchange, const std::string& queueName, const std::string& routingKey )
+{
+     amqp_queue_bind(
+          connection.impl_->connection,      /* amqp_connection_state_t state       */
+          1,                                 /* amqp_channel_t          channel     */
+          fromString( queueName.c_str() ),   /* amqp_bytes_t            queue       */
+          fromString( exchange.c_str() ),    /* amqp_bytes_t            exchange    */
+          fromString( routingKey.c_str() ),  /* amqp_bytes_t            routing_key */
+          amqp_empty_table                   /* amqp_table_t            argument    */
+     );
+     ensureNoErrors( amqp_get_rpc_reply( connection.impl_->connection ), "bind queue" );
+}
+
+
 boost::optional< SimpleClient::Envelope > SimpleClient::consumeMessage(
      const Connection& connection,
      const std::string& queueName,

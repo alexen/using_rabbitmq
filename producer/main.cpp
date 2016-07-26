@@ -32,8 +32,11 @@ int main()
           const Connection::Parameters params( hostname, port, username, password, virtualHost );
           Connection connection( params );
 
-          /// Публикуем сообщение только в exchange (как и полагается)
-          SimpleClient::publishMessage( connection, "", queueName, message );
+          /// Публикуем N сообщений только в exchange (как и полагается)
+          for( int i = 0; i < 5; ++i )
+          {
+               SimpleClient::publishMessage( connection, "", queueName, message );
+          }
 
           std::cout << "Done.\n";
      }

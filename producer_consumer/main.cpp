@@ -75,77 +75,77 @@ int main()
                "My Bonny is over the ocean\n"
                "So bring back my Bonny to me...\n";
 
-          const Connection::Parameters queueConnection( hostname, port, virtualHost, username, password );
-          const SimpleClient::QueueParameters billingQueue( exchange, routingKey, queueName );
-          const SimpleClient::QueueParameters brokenQueue( exchange, "broken", "broken" );
-
-          SimpleClient client( queueConnection );
-
-          const auto messages = {
-               "message 000",
-               "message 001",
-               "message 002",
-               "message 003",
-               "message 004",
-               "message 005",
-               "message 006",
-               "message 007",
-               "message 008",
-               "message 009"
-          };
-
-          int counter = 0;
-          for( auto&& each: messages )
-          {
-               client.publishMessage( brokenQueue, each );
-               if( ++counter == 3 )
-               {
-                    std::cout << "Press any key to continue...\n";
-                    std::cin.get();
-               }
-          }
-
-          return 0;
-
-          bool reconnectionRequired = false;
-
-          stop = false;
-          while( !stop )
-          {
-               if( reconnectionRequired )
-               {
-                    client.reconnect();
-                    reconnectionRequired = false;
-               }
-
-               try
-               {
-                    client.bind( billingQueue );
-
-                    while( !stop )
-                    {
-                         if( const auto& env = client.consumeMessage( billingQueue, boost::posix_time::seconds( 5 ) ) )
-                         {
-                              std::cout << "Got message: " << env->message << "\n";
-                              std::cout << "Press any key to continue...\n";
-                              std::cin.get();
-                              std::cout << "Publishing...\n";
-                              client.publishMessage( brokenQueue, env->message );
-                              std::cout << "Ack msg...\n";
-                              client.ackMessage( env->deliveryTag );
-                         }
-                         else
-                         {
-                              std::cout << "Timeout.\n";
-                         }
-                    }
-               }
-               catch( const ConnectionError& e )
-               {
-                    std::cerr << "exception: " << boost::diagnostic_information( e ) << "\n";
-                    reconnectionRequired = true;
-               }
-          }
+//          const Connection::Parameters queueConnection( hostname, port, virtualHost, username, password );
+//          const SimpleClient::QueueParameters billingQueue( exchange, routingKey, queueName );
+//          const SimpleClient::QueueParameters brokenQueue( exchange, "broken", "broken" );
+//
+//          SimpleClient client( queueConnection );
+//
+//          const auto messages = {
+//               "message 000",
+//               "message 001",
+//               "message 002",
+//               "message 003",
+//               "message 004",
+//               "message 005",
+//               "message 006",
+//               "message 007",
+//               "message 008",
+//               "message 009"
+//          };
+//
+//          int counter = 0;
+//          for( auto&& each: messages )
+//          {
+//               client.publishMessage( brokenQueue, each );
+//               if( ++counter == 3 )
+//               {
+//                    std::cout << "Press any key to continue...\n";
+//                    std::cin.get();
+//               }
+//          }
+//
+//          return 0;
+//
+//          bool reconnectionRequired = false;
+//
+//          stop = false;
+//          while( !stop )
+//          {
+//               if( reconnectionRequired )
+//               {
+//                    client.reconnect();
+//                    reconnectionRequired = false;
+//               }
+//
+//               try
+//               {
+//                    client.bind( billingQueue );
+//
+//                    while( !stop )
+//                    {
+//                         if( const auto& env = client.consumeMessage( billingQueue, boost::posix_time::seconds( 5 ) ) )
+//                         {
+//                              std::cout << "Got message: " << env->message << "\n";
+//                              std::cout << "Press any key to continue...\n";
+//                              std::cin.get();
+//                              std::cout << "Publishing...\n";
+//                              client.publishMessage( brokenQueue, env->message );
+//                              std::cout << "Ack msg...\n";
+//                              client.ackMessage( env->deliveryTag );
+//                         }
+//                         else
+//                         {
+//                              std::cout << "Timeout.\n";
+//                         }
+//                    }
+//               }
+//               catch( const ConnectionError& e )
+//               {
+//                    std::cerr << "exception: " << boost::diagnostic_information( e ) << "\n";
+//                    reconnectionRequired = true;
+//               }
+//          }
           std::cout << "Success!\n";
      }
      catch( const std::exception& e )

@@ -279,6 +279,54 @@ public:
 
      /// Инициирует переподключение к очереди посредством вызова Connection::reconnect()
      /// @see Connection::reconnect()
+     ///
+     /// Пример кода (в примере использованы статические методы класса, с вызовом метода переподключения
+     /// у класса Connection, однако при использовании объекта класса SimpleClient код будет выглядеть аналогично)
+     ///
+     /// @code
+     /// // Инициализация соединения
+     ///
+     /// Connection connection( hostname, port, username, password, virtualHost );
+     ///
+     /// bool reconnectionRequired = false;
+     ///
+     /// while( true )
+     /// {
+     ///      try
+     ///      {
+     ///           if( reconnectionRequired )
+     ///           {
+     ///                connection.reconnect();
+     ///                reconnectionRequired = false;
+     ///           }
+     ///
+     ///           SimpleClient::bind( connection, exchange, queueName );
+     ///
+     ///           const auto envelope = SimpleClient::consumeMessage( connection, "qtest.queue_name", boost::posix_time::seconds( 30 ) );
+     ///
+     ///           if( envelope )
+     ///           {
+     ///                std::cout << "Got message:\n" << envelope->message << "\n";
+     ///
+     ///                SimpleClient::ackMessage( connection, envelope->deliveryTag );
+     ///           }
+     ///           else
+     ///           {
+     ///                std::cout << "No message consumed.\n";
+     ///           }
+     ///      }
+     ///      catch( const ConnectionError& )
+     ///      {
+     ///           // Ставим признак переподключения
+     ///
+     ///           reconnectionRequired = true;
+     ///      }
+     ///      catch( const std::exception& )
+     ///      {
+     ///           // ...
+     ///      }
+     /// }
+     /// @endcode
      void reconnect();
 
 private:

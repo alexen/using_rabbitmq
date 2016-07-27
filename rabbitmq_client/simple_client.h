@@ -24,11 +24,11 @@ public:
      struct Parameters
      {
           Parameters(
-               const std::string& host,
-               int port_,
-               const std::string& user,
-               const std::string& pwd,
-               const std::string& vhost
+               const std::string& host
+               , int port_
+               , const std::string& user
+               , const std::string& pwd
+               , const std::string& vhost
           )
                : hostname( host )
                , port( port_ )
@@ -43,7 +43,14 @@ public:
           std::string virtualHost; ///< имя виртуального хоста очереди
      };
 
-     /// Конструктор. Автоматически вызывает метод connect()
+     /// Конструкторы. Автоматически вызывают метод connect()
+     Connection(
+          const std::string& host,
+          int port,
+          const std::string& user,
+          const std::string& pwd,
+          const std::string& vhost );
+
      explicit Connection( const Parameters& );
 
      /// Деструктор. Необходим для реализации идиомы Pimpl
@@ -74,7 +81,10 @@ private:
 };
 
 
-/// Класс реализует простой клиент для работы с очередью RabbitMQ
+/// @brief Класс реализует простой клиент для работы с очередью RabbitMQ
+///
+/// Класс содержит два по сути одинаковых интерфейса: статический и обычный. Статический интерфейс
+/// представляет собой набор статических функций, которые позволяют работать с очередью без создания объекта класса.
 class SimpleClient
 {
 public:
@@ -82,13 +92,13 @@ public:
      struct QueueParameters
      {
           QueueParameters(
-               std::string&& exch,
-               std::string&& rkey,
-               std::string&& qname
+               const std::string& exch
+               , const std::string& rkey
+               , const std::string& qname
           )
-               : exchange( std::move( exch ) )
-               , routingKey( std::move( rkey ) )
-               , queueName( std::move( qname ) )
+               : exchange( exch )
+               , routingKey( rkey )
+               , queueName( qname )
           {}
           std::string exchange;    ///< точка подключения к очереди (exchange в терминах AMQP)
           std::string routingKey;  ///< ключ маршрутизации для отправки/получения сообщений
@@ -109,32 +119,150 @@ public:
           std::uint64_t deliveryTag;    ///< Идентификатор сообщения (для подтверждения доставки)
      };
 
-     /// Конструктор. Создает внутри себя подключение к очереди посредством вызова конструктора Connection()
-     explicit SimpleClient( const Connection::Parameters& );
+     /// @brief Публикует сообщение в очередь
+     /// @details Метод поддерживает публикацию непосредственно в очередь, отправку сообщения в точку публикации,
+     /// а также отправку сообщения в точку публикации с указанием люча маршрутизации. Для того чтобы отправить
+     /// сообщение непосредственно в очередь, необходимо имя очереди передать в параметр @a routingKey, при этом
+     /// параметр @a exchange необходимо забить пустой строкой. Для передачи сообщения в точку публикации без
+     /// указания конкретной очереди, необходимо указать только параметр @a exchange, а параметр @a routingKey
+     /// забить пустой строкой. При указании обоих параметров - @a exchange и @a routingKey, сообщение будет
+     /// отправлено в точку публикации @a exchange, параметр @a routingKey при этом рассматривается не как имя очереди,
+     /// а как ключ маршрутизации (т.е. с поддержкой всевозможных wildcards).
+     ///
+     /// @note Для публикации сообщения в очередь достаточно указать название точки входа @a exchange
+     /// или название очереди, при этом название очереди передается в качестве параметра @a routingKey.
+     /// Неиспользуемые параметры забиваются пустыми строками.
+     ///
+     /// @attention В настоящее время реализация клиента требует, чтобы к моменту вызова метода точка
+     /// публикации @a exchange или очередь @a routingKey (при публикации непосредственно в очередь)
+     /// должны существовать и быть доступны
+     ///
+     /// Пример кода
+     /// @code
+     /// // Инициализация соединения
+     ///
+     /// Connection connection( hostname, port, username, password, virtualHost );
+     ///
+     /// // Отправляем сообщение "some message or data" непосредственно в очередь с именем "qtest.queue_name"
+     /// // (неиспользуемый параметр exchange забит пустой строкой)
+     /// // Очередь "qtest.queue_name" к моменту вызова должна существовать!
+     ///
+     /// SimpleClient::publishMessage( connection, "", "qtest.queue_name", "some message or data" );
+     ///
+     /// // Отправляем сообщение в точку публикации "qtest.exchange.fanout", при этом имя очереди не указываем
+     /// // Точка публикации "qtest.exchange.fanout" к моменту вызова должна существовать!
+     ///
+     /// SimpleClient::publishMessage( connection, "qtest.exchange.fanout", "", "some message or data" );
+     ///
+     /// // Отправляем сообщение с указанием точки публикации и ключа маршрутизации
+     /// // Точка публикации "qtest.exchange.fanout" к моменту вызова должна существовать, а вот очередь возможно и необязательно.
+     ///
+     /// SimpleClient::publishMessage( connection, "qtest.exchange.fanout", "qtest.queue_name", "some message or data" );
+     ///
+     /// @endcode
+     /// @param connection активное подключение к очереди
+     /// @param exchange точка для публикации сообщения (exchange в термниах AMQP)
+     /// @param routingKey ключ маршрутизации или название очереди
+     /// @param message публикуемое сообщение
+     /// @throw ConnectionError в случае разрыва или ошибок соединения
+     /// @throw std::runtime_error во всех остальных случаях
+     static void publishMessage(
+          const Connection& connection
+          , const std::string& exchange
+          , const std::string& routingKey
+          , const std::string& message
+     );
 
-     static void publishMessage( const Connection&, const std::string& exchange, const std::string& routingKey, const std::string& message );
-
+     /// @brief Связывает точку публикации @a exchange с конкретной очередью @a queueName. Также может быть указан @a routingKey
+     /// @note Используется только для прослушивания очереди
+     /// @attention К моменту вызова метода и точка публикации @a exchange, и очередь @a queueName должны существовать
+     /// @throw ConnectionError в случае разрыва или ошибок соединения
+     /// @throw std::runtime_error во всех остальных случаях
      static void bind( const Connection&, const std::string& exchange, const std::string& queueName, const std::string& routingKey = "" );
 
+     /// @brief Получает сообщение из очереди @a queueName с блокировкой вызывающего потока до получения сообщения или до истечения времени @a timeout
+     ///
+     /// Пример кода
+     /// @code
+     /// // Инициализация соединения
+     ///
+     /// Connection connection( hostname, port, username, password, virtualHost );
+     ///
+     /// // Прослушиваем непосредственно очередь, без связывания с точкой публикации (сообщения
+     /// // будут приходить только в том случае, если producer публикует сообщения непосредственно в очередь,
+     /// // или если связывание очереди с точкой публикации осуществляется администратором очереди)
+     ///
+     /// const auto envelope = SimpleClient::consumeMessage( connection, "qtest.queue_name" );
+     ///
+     /// // Прослушиваем очередь, предварительно связывая ее с конкретной точкой публикации
+     ///
+     /// SimpleClient::bind( connection, "qtest.exchange.fanout", "qtest.queue_name" );
+     ///
+     /// // Инициируем прослушивание очереди с блокировкой вызывающего потока
+     ///
+     /// const auto envelope = SimpleClient::consumeMessage( connection, "qtest.queue_name", boost::posix_time::seconds( 30 ) );
+     ///
+     /// if( envelope )
+     /// {
+     ///      std::cout << "Got message:\n" << envelope->message << "\n";
+     ///
+     ///      // Сразу приведу пример подтверждения сообщения
+     ///
+     ///      SimpleClient::ackMessage( connection, envelope->deliveryTag );
+     /// }
+     /// else
+     /// {
+     ///      std::cout << "Timeout.\n";
+     /// }
+     /// @endcode
+     /// @param exchange точка для публикации сообщения (exchange в термниах AMQP)
+     /// @param queueName название очереди
+     /// @param timout время ожидания сообщения (boost::none - бесконечное ожидание)
+     /// @return Envelope с сообщением или boost::none при таймауте
+     /// @throw ConnectionError в случае разрыва или ошибок соединения
+     /// @throw std::runtime_error во всех остальных случаях
      static boost::optional< Envelope > consumeMessage(
-          const Connection&,
+          const Connection& connection,
           const std::string& queueName,
           const boost::optional< boost::posix_time::time_duration >& timeout = boost::none
      );
 
+     /// Подтверждает получение сообщения
+     /// @param deliveryTag идентификатор сообщения (извлекается из очереди вместе с сообщением в составе Envelope)
+     /// @throw std::runtime_error во всех остальных случаях
      static void ackMessage( const Connection&, std::uint64_t deliveryTag );
 
-private:
-     static void publishMessage( const Connection&, const QueueParameters&, const std::string& message );
+     /// Конструкторы. Создают внутри себя подключение к очереди посредством вызова конструктора Connection()
+     SimpleClient(
+          const std::string& host,
+          int port,
+          const std::string& user,
+          const std::string& pwd,
+          const std::string& vhost
+     );
 
-     static void bind( const Connection&, const QueueParameters& );
+     explicit SimpleClient( const Connection::Parameters& );
 
-     static boost::optional< Envelope > consumeMessage(
-          const Connection&,
-          const QueueParameters&,
+     /// @see static void publishMessage()
+     void publishMessage( const std::string& exchange, const std::string& routingKey, const std::string& message );
+
+     /// @see static void bind()
+     void bind( const std::string& exchange, const std::string& queueName, const std::string& routingKey = "" );
+
+     /// @see static boost::optional< Envelope > consumeMessage()
+     boost::optional< Envelope > consumeMessage(
+          const std::string& queueName,
           const boost::optional< boost::posix_time::time_duration >& timeout = boost::none
      );
 
+     /// @see static void ackMessage()
+     void ackMessage( std::uint64_t deliveryTag );
+
+     /// Инициирует переподключение к очереди посредством вызова Connection::reconnect()
+     /// @see Connection::reconnect()
+     void reconnect();
+
+private:
      /// Возвращает true, если ожидание сообщений прерывается по таймауту
      static bool isTimedOutError( const amqp_rpc_reply_t& );
 
@@ -145,31 +273,6 @@ private:
      /// Осуществляет обработку ситуации, когда ожидание сообщения прерывается из-за неверного состояния фрейма
      /// @note код взят из примера example/amqp_consumer.c библиотеки rabbitmq-c
      static void handleUnexpectedFrameStateError( const Connection& );
-
-     /// @brief Публикует сообщение @a message в очередь, которая описывается параметрами @a param
-     /// @note Осуществляет попытки повторного соединения при перехвате исключения ConnectionError
-     /// @throw ConnectionError в случае если все попытки подключения закончились неудачей
-     /// @throw std::runtime_error во всех остальных случаях
-     void publishMessage( const QueueParameters& params, const std::string& message );
-
-     /// @brief Осуществляет связывание клиента с очередью, которая описывается параметрами @a param.
-     /// @note Используется только для прослушивания очереди. В случае циклического прослушивания очереди метод должен вызываться вне цикла.
-     /// @throws ConnectionError, std::runtime_error
-     void bind( const QueueParameters& param );
-
-     /// @brief Активирует прослушивание очереди. Блокирует вызывающий поток до получения сообщений.
-     /// @param params параметры очереди
-     /// @param timeout таймаут подключения (boost::none - "вечное" подключение)
-     /// @return Envelope в случае получения сообщения, boost::none при таймауте
-     /// @throws ConnectionError, std::runtime_error
-     boost::optional< Envelope > consumeMessage(
-          const QueueParameters& params,
-          const boost::optional< boost::posix_time::time_duration >& timeout = boost::none
-     );
-
-     void ackMessage( std::uint64_t deliveryTag );
-
-     void reconnect();
 
      Connection connection_;
 };

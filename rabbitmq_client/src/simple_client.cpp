@@ -92,6 +92,17 @@ struct Connection::Impl
 };
 
 
+Connection::Connection(
+     const std::string& host
+     , int port
+     , const std::string& user
+     , const std::string& pwd
+     , const std::string& vhost
+)
+     : Connection( Parameters( host, port, user, pwd, vhost ) )
+{}
+
+
 Connection::Connection( const Connection::Parameters& params )
      : params_( params )
      , impl_( std::move( make_unique< Connection::Impl >() ) )
@@ -172,24 +183,6 @@ void Connection::reconnect()
 }
 
 
-void SimpleClient::publishMessage( const Connection& connection, const SimpleClient::QueueParameters& params, const std::string& message )
-{
-     ensureNoErrors(
-          amqp_basic_publish(
-               connection.impl_->connection,                     /* amqp_connection_state_t                 state       */
-               1,                                                /* amqp_channel_t                          channel     */
-               amqp_cstring_bytes( params.exchange.c_str() ),    /* amqp_bytes_t                            exchange    */
-               amqp_cstring_bytes( params.routingKey.c_str() ),  /* amqp_bytes_t                            routing_key */
-               0,                                                /* amqp_boolean_t                          mandatory   */
-               0,                                                /* amqp_boolean_t                          immediate   */
-               nullptr,                                          /* struct amqp_basic_properties_t_ const * properties  */
-               amqp_cstring_bytes( message.c_str() )             /* amqp_bytes_t                            body        */
-          ),
-          "basic publish"
-     );
-}
-
-
 void SimpleClient::publishMessage( const Connection& connection, const std::string& exchange, const std::string& routingKey, const std::string& message )
 {
      ensureNoErrors(
@@ -253,74 +246,6 @@ boost::optional< SimpleClient::Envelope > SimpleClient::consumeMessage(
           amqp_empty_table              /* amqp_table_t            arguments    */
      );
      ensureNoErrors( amqp_get_rpc_reply( connection.impl_->connection ), "basic consume" );
-
-     amqp_maybe_release_buffers( connection.impl_->connection );
-
-     amqp_envelope_t envelope = { 0 };
-
-     const auto timer = makeTimeval( timeout );
-
-     const auto reply =
-          amqp_consume_message(
-               connection.impl_->connection,
-               &envelope,
-               timer ? boost::addressof( *timer ) : nullptr,
-               0
-          );
-
-     if( isTimedOutError( reply ) )
-     {
-          return boost::none;
-     }
-     else if( isUnexpectedFrameStateError( reply ) )
-     {
-          handleUnexpectedFrameStateError( connection );
-          return boost::none;
-     }
-     else
-     {
-          ensureNoErrors( reply, "consume message" );
-     }
-
-     std::unique_ptr< amqp_envelope_t, void(*)( amqp_envelope_t* ) > autocleaner( &envelope, amqp_destroy_envelope );
-
-     return SimpleClient::Envelope( toString( envelope.message.body ), envelope.delivery_tag );
-}
-
-
-void SimpleClient::bind( const Connection& connection, const SimpleClient::QueueParameters& params )
-{
-     amqp_queue_bind(
-          connection.impl_->connection,                     /* amqp_connection_state_t state       */
-          1,                                                /* amqp_channel_t          channel     */
-          amqp_cstring_bytes( params.queueName.c_str() ),   /* amqp_bytes_t            queue       */
-          amqp_cstring_bytes( params.exchange.c_str() ),    /* amqp_bytes_t            exchange    */
-          amqp_cstring_bytes( params.routingKey.c_str() ),  /* amqp_bytes_t            routing_key */
-          amqp_empty_table                                  /* amqp_table_t            argument    */
-     );
-     ensureNoErrors( amqp_get_rpc_reply( connection.impl_->connection ), "bind queue" );
-}
-
-
-boost::optional< SimpleClient::Envelope > SimpleClient::consumeMessage(
-     const Connection& connection,
-     const SimpleClient::QueueParameters& params,
-     const boost::optional< boost::posix_time::time_duration >& timeout )
-{
-     static auto makeTimeval =
-          []( const boost::optional< boost::posix_time::time_duration >& duration ) -> std::unique_ptr< timeval >
-          {
-               if( duration )
-               {
-                    std::unique_ptr< timeval > tv( new timeval );
-                    tv->tv_sec = duration->total_seconds();
-                    tv->tv_usec = duration->fractional_seconds();
-                    return tv;
-               }
-
-               return nullptr;
-          };
-
 
      amqp_maybe_release_buffers( connection.impl_->connection );
 
@@ -453,32 +378,42 @@ void SimpleClient::handleUnexpectedFrameStateError( const Connection& connection
 }
 
 
+SimpleClient::SimpleClient(
+     const std::string& host,
+     int port,
+     const std::string& user,
+     const std::string& pwd,
+     const std::string& vhost
+)
+     : SimpleClient( Connection::Parameters( host, port, user, pwd, vhost ) )
+{}
+
 SimpleClient::SimpleClient( const Connection::Parameters& params )
      : connection_( params )
 {}
 
 
-void SimpleClient::publishMessage( const QueueParameters& params, const std::string& message )
+void SimpleClient::publishMessage( const std::string& exchange, const std::string& routingKey, const std::string& message )
 {
      aux::doOperationReconnectOnError(
-          [ & ](){ SimpleClient::publishMessage( connection_, params, message ); },
+          [ & ](){ SimpleClient::publishMessage( connection_, exchange, routingKey, message ); },
           [ this ](){ reconnect(); }
      );
 }
 
 
-void SimpleClient::bind( const QueueParameters& params )
+void SimpleClient::bind( const std::string& exchange, const std::string& queueName, const std::string& routingKey )
 {
-     SimpleClient::bind( connection_, params );
+     SimpleClient::bind( connection_, exchange, queueName, routingKey );
 }
 
 
 boost::optional< SimpleClient::Envelope > SimpleClient::consumeMessage(
-     const QueueParameters& params,
+     const std::string& queueName,
      const boost::optional< boost::posix_time::time_duration >& timeout
 )
 {
-     return SimpleClient::consumeMessage( connection_, params, timeout );
+     return SimpleClient::consumeMessage( connection_, queueName, timeout );
 }
 
 

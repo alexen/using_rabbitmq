@@ -212,12 +212,23 @@ void SimpleClient::bind( const Connection& connection, const std::string& exchan
           amqp_empty_table                   /* amqp_table_t            argument    */
      );
      ensureNoErrors( amqp_get_rpc_reply( connection.impl_->connection ), "bind queue" );
+
+     amqp_basic_consume(
+          connection.impl_->connection, /* amqp_connection_state_t state        */
+          1,                            /* amqp_channel_t          channel      */
+          fromString( queueName ),      /* amqp_bytes_t            queue        */
+          amqp_empty_bytes,             /* amqp_bytes_t            consumer_tag */
+          0,                            /* amqp_boolean_t          no_local     */
+          0,                            /* amqp_boolean_t          no_ack       */
+          0,                            /* amqp_boolean_t          exclusive    */
+          amqp_empty_table              /* amqp_table_t            arguments    */
+     );
+     ensureNoErrors( amqp_get_rpc_reply( connection.impl_->connection ), "basic consume" );
 }
 
 
 boost::optional< SimpleClient::Envelope > SimpleClient::consumeMessage(
      const Connection& connection,
-     const std::string& queueName,
      const boost::optional< boost::posix_time::time_duration >& timeout
 )
 {
@@ -234,18 +245,6 @@ boost::optional< SimpleClient::Envelope > SimpleClient::consumeMessage(
 
                return nullptr;
           };
-
-     amqp_basic_consume(
-          connection.impl_->connection, /* amqp_connection_state_t state        */
-          1,                            /* amqp_channel_t          channel      */
-          fromString( queueName ),      /* amqp_bytes_t            queue        */
-          amqp_empty_bytes,             /* amqp_bytes_t            consumer_tag */
-          0,                            /* amqp_boolean_t          no_local     */
-          0,                            /* amqp_boolean_t          no_ack       */
-          0,                            /* amqp_boolean_t          exclusive    */
-          amqp_empty_table              /* amqp_table_t            arguments    */
-     );
-     ensureNoErrors( amqp_get_rpc_reply( connection.impl_->connection ), "basic consume" );
 
      amqp_maybe_release_buffers( connection.impl_->connection );
 
@@ -422,20 +421,10 @@ void SimpleClient::bind( const QueueParameters& params )
 
 
 boost::optional< SimpleClient::Envelope > SimpleClient::consumeMessage(
-     const std::string& queueName,
      const boost::optional< boost::posix_time::time_duration >& timeout
 )
 {
-     return SimpleClient::consumeMessage( connection_, queueName, timeout );
-}
-
-
-boost::optional< SimpleClient::Envelope > SimpleClient::consumeMessage(
-     const QueueParameters& params,
-     const boost::optional< boost::posix_time::time_duration >& timeout
-)
-{
-     return consumeMessage( params.queueName, timeout );
+     return SimpleClient::consumeMessage( connection_, timeout );
 }
 
 

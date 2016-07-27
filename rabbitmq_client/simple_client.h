@@ -178,7 +178,8 @@ public:
 
      /// @brief Связывает точку публикации @a exchange с конкретной очередью @a queueName. Также может быть указан @a routingKey
      /// @note Используется только для прослушивания очереди
-     /// @attention К моменту вызова метода и точка публикации @a exchange, и очередь @a queueName должны существовать
+     /// @attention К моменту вызова метода и точка публикации @a exchange, и очередь @a queueName должны существовать.
+     /// При циклическом прослушивании очереди метод должен вызываться однократно!
      /// @throw ConnectionError в случае разрыва или ошибок соединения
      /// @throw std::runtime_error во всех остальных случаях
      static void bind(
@@ -189,23 +190,20 @@ public:
 
      /// @brief Получает сообщение из очереди @a queueName с блокировкой вызывающего потока до получения сообщения или до истечения времени @a timeout
      ///
+     /// @note Требует предварительного вызова метода bind()
+     ///
+     /// @attention При оборачивании в цикл для постоянного прослушивания очереди, код необходимо организовывать таким образом
+     /// чтобы метод bind(), предшествующий данному методу, вызывался однократно!
+     ///
      /// Пример кода
      /// @code
      /// // Инициализация соединения
      ///
      /// Connection connection( hostname, port, username, password, virtualHost );
      ///
-     /// // Прослушиваем непосредственно очередь, без связывания с точкой публикации (сообщения
-     /// // будут приходить только в том случае, если producer публикует сообщения непосредственно в очередь,
-     /// // или если связывание очереди с точкой публикации осуществляется администратором очереди)
-     ///
-     /// const auto envelope = SimpleClient::consumeMessage( connection, "qtest.queue_name" );
-     ///
-     /// // Прослушиваем очередь, предварительно связывая ее с конкретной точкой публикации
+     /// // Инициируем прослушивание очереди предварительно связав ее с конкретной точкой публикации
      ///
      /// SimpleClient::bind( connection, "qtest.exchange.fanout", "qtest.queue_name" );
-     ///
-     /// // Инициируем прослушивание очереди с блокировкой вызывающего потока
      ///
      /// const auto envelope = SimpleClient::consumeMessage( connection, "qtest.queue_name", boost::posix_time::seconds( 30 ) );
      ///
@@ -222,6 +220,64 @@ public:
      ///      std::cout << "Timeout.\n";
      /// }
      /// @endcode
+     ///
+     /// Пример кода с организацией циклического прослушивания очереди
+     /// (в примере использованы статические методы класса, с вызовом метода переподключения
+     /// у класса Connection, однако при использовании объекта класса SimpleClient код будет выглядеть аналогично)
+     ///
+     /// @code
+     /// // Инициализация соединения
+     ///
+     /// Connection connection( hostname, port, username, password, virtualHost );
+     ///
+     /// bool reconnectionRequired = false;
+     ///
+     /// while( true )
+     /// {
+     ///      try
+     ///      {
+     ///           if( reconnectionRequired )
+     ///           {
+     ///                connection.reconnect();
+     ///                reconnectionRequired = false;
+     ///           }
+     ///
+     ///           // Связывание необходимо вызывать строго однократно
+     ///
+     ///           SimpleClient::bind( connection, "qtest.exchange.fanout", "qtest.queue_name" );
+     ///
+     ///           while( true )
+     ///           {
+     ///                const auto envelope = SimpleClient::consumeMessage( connection, boost::posix_time::seconds( 30 ) );
+     ///
+     ///                if( envelope )
+     ///                {
+     ///                     std::cout << "Got message:\n" << envelope->message << "\n";
+     ///
+     ///                     // ...
+     ///                     // Здесь некоторая обработка полученного сообщения
+     ///                     // ...
+     ///
+     ///                     SimpleClient::ackMessage( connection, envelope->deliveryTag );
+     ///                }
+     ///                else
+     ///                {
+     ///                     std::cout << "No message consumed.\n";
+     ///                }
+     ///           }
+     ///      }
+     ///      catch( const ConnectionError& )
+     ///      {
+     ///           // Ставим признак переподключения
+     ///
+     ///           reconnectionRequired = true;
+     ///      }
+     ///      catch( const std::exception& )
+     ///      {
+     ///           // ...
+     ///      }
+     /// }
+     /// @endcode
      /// @param exchange точка для публикации сообщения (exchange в термниах AMQP)
      /// @param queueName название очереди
      /// @param timout время ожидания сообщения (boost::none - бесконечное ожидание)
@@ -230,7 +286,6 @@ public:
      /// @throw std::runtime_error во всех остальных случаях
      static boost::optional< Envelope > consumeMessage(
           const Connection& connection,
-          const std::string& queueName,
           const boost::optional< boost::posix_time::time_duration >& timeout = boost::none
      );
 
@@ -264,13 +319,6 @@ public:
 
      /// @see static boost::optional< Envelope > consumeMessage()
      boost::optional< Envelope > consumeMessage(
-          const std::string& queueName,
-          const boost::optional< boost::posix_time::time_duration >& timeout = boost::none
-     );
-
-     /// @see static boost::optional< Envelope > consumeMessage()
-     boost::optional< Envelope > consumeMessage(
-          const QueueParameters& params,
           const boost::optional< boost::posix_time::time_duration >& timeout = boost::none
      );
 
@@ -279,54 +327,6 @@ public:
 
      /// Инициирует переподключение к очереди посредством вызова Connection::reconnect()
      /// @see Connection::reconnect()
-     ///
-     /// Пример кода (в примере использованы статические методы класса, с вызовом метода переподключения
-     /// у класса Connection, однако при использовании объекта класса SimpleClient код будет выглядеть аналогично)
-     ///
-     /// @code
-     /// // Инициализация соединения
-     ///
-     /// Connection connection( hostname, port, username, password, virtualHost );
-     ///
-     /// bool reconnectionRequired = false;
-     ///
-     /// while( true )
-     /// {
-     ///      try
-     ///      {
-     ///           if( reconnectionRequired )
-     ///           {
-     ///                connection.reconnect();
-     ///                reconnectionRequired = false;
-     ///           }
-     ///
-     ///           SimpleClient::bind( connection, exchange, queueName );
-     ///
-     ///           const auto envelope = SimpleClient::consumeMessage( connection, "qtest.queue_name", boost::posix_time::seconds( 30 ) );
-     ///
-     ///           if( envelope )
-     ///           {
-     ///                std::cout << "Got message:\n" << envelope->message << "\n";
-     ///
-     ///                SimpleClient::ackMessage( connection, envelope->deliveryTag );
-     ///           }
-     ///           else
-     ///           {
-     ///                std::cout << "No message consumed.\n";
-     ///           }
-     ///      }
-     ///      catch( const ConnectionError& )
-     ///      {
-     ///           // Ставим признак переподключения
-     ///
-     ///           reconnectionRequired = true;
-     ///      }
-     ///      catch( const std::exception& )
-     ///      {
-     ///           // ...
-     ///      }
-     /// }
-     /// @endcode
      void reconnect();
 
 private:

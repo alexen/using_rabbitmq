@@ -10,6 +10,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/thread.hpp>
 #include <boost/chrono/duration.hpp>
+#include <rabbitmq_client/error.h>
 #include <rabbitmq_client/simple_client.h>
 
 
@@ -60,6 +61,7 @@ void worker(
      const boost::optional< boost::chrono::milliseconds >& processingDelay = boost::none )
 {
      using edi::ts::rabbitmq_client::Connection;
+     using edi::ts::rabbitmq_client::ConnectionError;
      using edi::ts::rabbitmq_client::SimpleClient;
 
      const Connection::Parameters params(
@@ -71,16 +73,42 @@ void worker(
      );
 
      Connection connection( params );
-     SimpleClient::bind( connection, exchange, queueName );
-     const auto& env = SimpleClient::consumeMessage( connection, queueName, timeout );
-     if( env )
+     bool reconnect = false;
+     while( true )
      {
-          std::cout << "Got message:\n" << env->message << "\n";
-          SimpleClient::ackMessage( connection, env->deliveryTag );
-     }
-     else
-     {
-          std::cout << "No message consumed.\n";
+          try
+          {
+               if( reconnect )
+               {
+                    connection.reconnect();
+                    reconnect = false;
+               }
+
+               SimpleClient::bind( connection, exchange, queueName );
+               while( true )
+               {
+                    const auto& env = SimpleClient::consumeMessage( connection, timeout );
+                    if( env )
+                    {
+                         std::cout << "Got message:\n" << env->message << "\n";
+                         SimpleClient::ackMessage( connection, env->deliveryTag );
+                    }
+                    else
+                    {
+                         std::cout << "No message consumed.\n";
+                    }
+               }
+          }
+          catch( const ConnectionError& e )
+          {
+               std::cerr << "connection error: " << e.what() << "\n";
+               reconnect = true;
+          }
+          catch( const std::runtime_error& e )
+          {
+               std::cerr << "exception: " << boost::diagnostic_information( e ) << "\n";
+               return;
+          }
      }
 }
 
@@ -89,20 +117,21 @@ int main()
 {
      try
      {
-          const auto hostname = "localhost";
+          const auto hostname = "10.0.10.229";
           const auto port = 5672;
-          const auto virtualHost = "vhost.test";
-          const auto username = "guest";
-          const auto password = "guest";
-          const auto exchange = "exchange.test.fanout";
-          const auto routingKey = "";
-          const auto queueName = "queue.test.001";
-          const boost::posix_time::seconds timeout( 15 );
+          const auto username = "edi-ts";
+          const auto password = "123456";
+          const auto virtualHost = "b2b";
+          const auto exchange = "amq.direct";
+          const auto routingKey = "billing";
+          const auto queueName = "billing";
+          const boost::posix_time::seconds timeout( 5
+               );
           const boost::chrono::milliseconds procDelay( 0 );
 
           boost::thread_group tg;
 
-          for( int i=0; i < 10; ++i )
+          for( int i=0; i < 1; ++i )
           {
                tg.create_thread(
                     [ & ]()

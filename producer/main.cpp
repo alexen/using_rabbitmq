@@ -15,14 +15,14 @@ int main()
 
      try
      {
-          const auto hostname = "localhost";
+          const auto hostname = "10.0.10.229";
           const auto port = 5672;
-          const auto username = "guest";
-          const auto password = "guest";
-          const auto virtualHost = "vhost.test";
-          const auto exchange = "exchange.test.fanout";
-          const auto routingKey = "";
-          const auto queueName = "queue.test.001";
+          const auto username = "edi-ts";
+          const auto password = "123456";
+          const auto virtualHost = "b2b";
+          const auto exchange = "amq.direct";
+          const auto routingKey = "billing";
+          const auto queueName = "billing";
           const auto message =
                "My Bonny is over the ocean,\n"
                "My Bonny is over the sea,\n"
@@ -35,7 +35,8 @@ int main()
           /// Публикуем N сообщений только в exchange (как и полагается)
           for( int i = 0; i < 5; ++i )
           {
-               SimpleClient::publishMessage( connection, exchange, "", message );
+               std::cout << "Publishing message!\n";
+               SimpleClient::publishMessage( connection, exchange, routingKey, message );
           }
 
           std::cout << "Done.\n";

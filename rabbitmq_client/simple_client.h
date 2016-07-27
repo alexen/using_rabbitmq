@@ -85,6 +85,9 @@ private:
 ///
 /// Класс содержит два по сути одинаковых интерфейса: статический и обычный. Статический интерфейс
 /// представляет собой набор статических функций, которые позволяют работать с очередью без создания объекта класса.
+/// Статический интерфейс не обеспечивает попыток переподключения при работе с очередью.
+/// Ряд методов обычного интерфейса обеспечивают перехват исключения при разрыве соединения и инициализируют
+/// попытку переподключения к очереди.
 class SimpleClient
 {
 public:
@@ -178,7 +181,11 @@ public:
      /// @attention К моменту вызова метода и точка публикации @a exchange, и очередь @a queueName должны существовать
      /// @throw ConnectionError в случае разрыва или ошибок соединения
      /// @throw std::runtime_error во всех остальных случаях
-     static void bind( const Connection&, const std::string& exchange, const std::string& queueName, const std::string& routingKey = "" );
+     static void bind(
+          const Connection&,
+          const std::string& exchange,
+          const std::string& queueName,
+          const std::string& routingKey = "" );
 
      /// @brief Получает сообщение из очереди @a queueName с блокировкой вызывающего потока до получения сообщения или до истечения времени @a timeout
      ///
@@ -246,12 +253,24 @@ public:
      /// @see static void publishMessage()
      void publishMessage( const std::string& exchange, const std::string& routingKey, const std::string& message );
 
+     /// @see static void publishMessage()
+     void publishMessage( const QueueParameters& params, const std::string& message );
+
      /// @see static void bind()
      void bind( const std::string& exchange, const std::string& queueName, const std::string& routingKey = "" );
+
+     /// @see static void bind()
+     void bind( const QueueParameters& params );
 
      /// @see static boost::optional< Envelope > consumeMessage()
      boost::optional< Envelope > consumeMessage(
           const std::string& queueName,
+          const boost::optional< boost::posix_time::time_duration >& timeout = boost::none
+     );
+
+     /// @see static boost::optional< Envelope > consumeMessage()
+     boost::optional< Envelope > consumeMessage(
+          const QueueParameters& params,
           const boost::optional< boost::posix_time::time_duration >& timeout = boost::none
      );
 

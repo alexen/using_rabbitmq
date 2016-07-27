@@ -30,7 +30,7 @@ namespace aux {
 
 
 template< typename NetworkOp, typename ReconnectionOp >
-void doOperationReconnectOnError( NetworkOp&& networkOp, ReconnectionOp&& reconnectionOp )
+void doReconnectOnError( NetworkOp&& networkOp, ReconnectionOp&& reconnectionOp )
 {
      try
      {
@@ -395,16 +395,29 @@ SimpleClient::SimpleClient( const Connection::Parameters& params )
 
 void SimpleClient::publishMessage( const std::string& exchange, const std::string& routingKey, const std::string& message )
 {
-     aux::doOperationReconnectOnError(
+     aux::doReconnectOnError(
           [ & ](){ SimpleClient::publishMessage( connection_, exchange, routingKey, message ); },
           [ this ](){ reconnect(); }
      );
 }
 
 
+void SimpleClient::publishMessage( const QueueParameters& params, const std::string& message )
+{
+     publishMessage( params.exchange, params.routingKey, message );
+}
+
+
+
 void SimpleClient::bind( const std::string& exchange, const std::string& queueName, const std::string& routingKey )
 {
      SimpleClient::bind( connection_, exchange, queueName, routingKey );
+}
+
+
+void SimpleClient::bind( const QueueParameters& params )
+{
+     bind( params.exchange, params.queueName, params.routingKey );
 }
 
 
@@ -417,9 +430,18 @@ boost::optional< SimpleClient::Envelope > SimpleClient::consumeMessage(
 }
 
 
+boost::optional< SimpleClient::Envelope > SimpleClient::consumeMessage(
+     const QueueParameters& params,
+     const boost::optional< boost::posix_time::time_duration >& timeout
+)
+{
+     return consumeMessage( params.queueName, timeout );
+}
+
+
 void SimpleClient::ackMessage( std::uint64_t deliveryTag )
 {
-     aux::doOperationReconnectOnError(
+     aux::doReconnectOnError(
           [ & ](){ SimpleClient::ackMessage( connection_, deliveryTag ); },
           [ this ](){ reconnect(); }
      );
